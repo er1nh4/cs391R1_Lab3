@@ -95,28 +95,34 @@ always @(posedge clk) begin
             immid <= {curr_instruction[31:12], 12'b0};
             alu_op1 <= rs;
             
-            // 
+            // Setting ALU_CONTROL line
             case (funct3) 
-               3'b000: begin
+                // ADDI (0)
+                3'b000: begin
                     alu_control <= 4'b0000; 
                     alu_op2 <= immid; 
                     end
+                // XORI (4)
                 3'b100: begin 
                     alu_control <= 4'b0010; 
                     alu_op2 <= immid; 
                     end
+                // ORI (6)
                 3'b110: begin
                     alu_control <= 4'b0011; 
                     alu_op2 <= immid;
                     end
+                // ANDI (7)
                 3'b111: begin 
                     alu_control <= 4'b0100; 
                     alu_op2 <= immid; 
                     end
+                // SLLI (1)
                 3'b001: begin 
                     alu_control <= 4'b0101; 
                     alu_op2 <= curr_instruction[24:20];
                      end
+                // SRLI : SRAI (5)
                 3'b101: begin
                     alu_op2 <= curr_instruction[24:20];
                     alu_control <= (funct7 == 7'b0100000) ? 4'b0111 : 4'b0110;
@@ -132,17 +138,24 @@ always @(posedge clk) begin
             alu_op1 <= rs;
             alu_op2 <= (curr_instruction[5]) ? curr_instruction[31:14] : rt;
             
-            case (funct3)
+            // Setting ALU_CONTROL
+            case (funct3) 
+                // SUB, ADD (O)
                 3'b000: alu_control <= (funct7 == 7'b0100000) ? 4'b0001 : 4'b0000;
+                // XOR (4)
                 3'b100: alu_control <= 4'b0010;
+                // OR (6)
                 3'b110: alu_control <= 4'b0011;
+                // AND (7)
                 3'b111: alu_control <= 4'b0100;
+                // SLL (1)
                 3'b001: alu_control <= 4'b0101;
+                // SRA : SRL (5)
                 3'b101: alu_control <= (funct7 == 7'b0100000) ? 4'b0111 : 4'b0110;
                 default: alu_control <= 4'b1111; // invalid
             endcase
             
-            alu_control <= curr_instruction[3:0];
+            // Move ontro next state.
             state <= 2;      
         
         // Some invalid opcode.
