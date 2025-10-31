@@ -22,6 +22,12 @@ reg[3:0] rt_sel;
 wire[31:0] rs;
 wire[31:0] rt;
 
+// Additional Fields From Instruction
+reg[6:0] opcode;
+reg[2:0] funct3;
+reg[6:0] funct7;
+reg[31:0] immid = 32'd0;
+
 register_file reg_file(
     .clk(clk),
     .we(we),
@@ -70,20 +76,52 @@ always @(posedge clk) begin
     
     // Sending instructions to ALU
     end else if (state == 1) begin
+    
+        // Obtaining additional fields
+        opcode <= curr_instruction[6:0];
+        funct3 <= curr_instruction[14:12];
+        funct7 <= curr_instruction[31:25];
+    
         // Adding support for LUI (load-upper immediate) instruction
         // Opcode for Load Upper Imm = 0110111, rd = imm << 12.
-        if (curr_instruction[6:0] == 7'b0110111) begin 
-            d_in <= curr_instruction[31:12] << 12;
+        if (opcode == 7'b0110111) begin 
+            d_in <= {curr_instruction[31:12], 12'b0};
             rd_sel <= curr_instruction[11:7];
             we <= (rd_sel != 4'b0000);
             state <= 3;
-               
-        end else begin
-        alu_op1 <= rs;
-        alu_op2 <= (curr_instruction[5]) ? curr_instruction[31:14] : rt;
-        alu_control <= curr_instruction[3:0];
-        state <= 2;
         
+        // Adding support for I-Type instruction
+        end else if (opcode == 7'b001011) begin
+            immid <= {curr_instruction[31:12], 12'b0};
+            alu_op1 <= rs;
+            
+            case (funct3) 
+                3'b000: alu_op2 <= immid;              
+                3'b100: alu_op2 <= immid;              
+                3'b110: alu_op2 <= immid;            
+                3'b111: alu_op2 <= immid;
+                3'b001: alu_op2 <= curr_instruction[24:20];
+                3'b101: begin 
+                    alu_op2 <= curr_instruction[24:20];
+                    alu_control <= (funct7 == 7'b0100000) ? 3'b101 : 3'b110; 
+                end
+                default: alu_op2 <= 32'd0;
+            endcase
+      
+            // Move onto next state
+            state <= 2;
+
+        // R-type instruction       
+        end else if(opcode == 7'b0110011) begin
+            alu_op1 <= rs;
+            alu_op2 <= (curr_instruction[5]) ? curr_instruction[31:14] : rt;
+            alu_control <= curr_instruction[3:0];
+            state <= 2;      
+        
+        // Some invalid opcode.
+        end else begin
+            error <= 1;
+            state <= 0;
         end
         
     // Writing to register file.
