@@ -52,7 +52,10 @@ always @(posedge clk) begin
         state <= 0;
         we <= 0;
         error <= 0;
+        
+        
     end else if (state == 0 && valid) begin
+    
         curr_instruction <= instruction;
         
         if (instruction[5]) begin
@@ -64,12 +67,28 @@ always @(posedge clk) begin
         
         state <= 1;
         error <= 0;
+    
+    // Sending instructions to ALU
     end else if (state == 1) begin
+        // Adding support for LUI (load-upper immediate) instruction
+        // Opcode for Load Upper Imm = 0110111, rd = imm << 12.
+        if (curr_instruction[6:0] == 7'b0110111) begin 
+            d_in <= curr_instruction[31:12] << 12;
+            rd_sel <= curr_instruction[11:7];
+            we <= (rd_sel != 4'b0000);
+            state <= 3;
+               
+        end else begin
         alu_op1 <= rs;
         alu_op2 <= (curr_instruction[5]) ? curr_instruction[31:14] : rt;
         alu_control <= curr_instruction[3:0];
         state <= 2;
+        
+        end
+        
+    // Writing to register file.
     end else if (state == 2) begin
+    
         if (alu_error) begin
             error <= 1;
             state <= 0;
