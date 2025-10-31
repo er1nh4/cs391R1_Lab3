@@ -95,26 +95,53 @@ always @(posedge clk) begin
             immid <= {curr_instruction[31:12], 12'b0};
             alu_op1 <= rs;
             
+            // 
             case (funct3) 
-                3'b000: alu_op2 <= immid;              
-                3'b100: alu_op2 <= immid;              
-                3'b110: alu_op2 <= immid;            
-                3'b111: alu_op2 <= immid;
-                3'b001: alu_op2 <= curr_instruction[24:20];
-                3'b101: begin 
+               3'b000: begin
+                    alu_control <= 4'b0000; 
+                    alu_op2 <= immid; 
+                    end
+                3'b100: begin 
+                    alu_control <= 4'b0010; 
+                    alu_op2 <= immid; 
+                    end
+                3'b110: begin
+                    alu_control <= 4'b0011; 
+                    alu_op2 <= immid;
+                    end
+                3'b111: begin 
+                    alu_control <= 4'b0100; 
+                    alu_op2 <= immid; 
+                    end
+                3'b001: begin 
+                    alu_control <= 4'b0101; 
                     alu_op2 <= curr_instruction[24:20];
-                    alu_control <= (funct7 == 7'b0100000) ? 3'b101 : 3'b110; 
+                     end
+                3'b101: begin
+                    alu_op2 <= curr_instruction[24:20];
+                    alu_control <= (funct7 == 7'b0100000) ? 4'b0111 : 4'b0110;
                 end
-                default: alu_op2 <= 32'd0;
+                default: begin alu_control <= 4'b1111; end
             endcase
       
             // Move onto next state
             state <= 2;
 
-        // R-type instruction       
+        // Adding support for R-type instructions       
         end else if(opcode == 7'b0110011) begin
             alu_op1 <= rs;
             alu_op2 <= (curr_instruction[5]) ? curr_instruction[31:14] : rt;
+            
+            case (funct3)
+                3'b000: alu_control <= (funct7 == 7'b0100000) ? 4'b0001 : 4'b0000;
+                3'b100: alu_control <= 4'b0010;
+                3'b110: alu_control <= 4'b0011;
+                3'b111: alu_control <= 4'b0100;
+                3'b001: alu_control <= 4'b0101;
+                3'b101: alu_control <= (funct7 == 7'b0100000) ? 4'b0111 : 4'b0110;
+                default: alu_control <= 4'b1111; // invalid
+            endcase
+            
             alu_control <= curr_instruction[3:0];
             state <= 2;      
         
@@ -124,7 +151,7 @@ always @(posedge clk) begin
             state <= 0;
         end
         
-    // Writing to register file.
+    // Execute ALU and writing to register file.
     end else if (state == 2) begin
     
         if (alu_error) begin
@@ -144,6 +171,7 @@ always @(posedge clk) begin
             rd_sel <= curr_instruction[9:6];
             state <= 3;
         end
+        
     end else if (state == 3) begin
         we <= 0;
         state <= 0;
