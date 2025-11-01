@@ -16,19 +16,19 @@ assign ready = state == 0;
 
 reg we;
 reg[31:0] d_in;
-reg[3:0] rd_sel;
-reg[3:0] rs_sel;
-reg[3:0] rt_sel;
+reg[4:0] rd_sel;
+reg[4:0] rs_sel;
+reg[4:0] rt_sel;
 wire[31:0] rs;
 wire[31:0] rt;
 
-// Additional Fields From Instruction
+// Additional Fields In Instruction
 reg[6:0] opcode;
 reg[2:0] funct3;
 reg[6:0] funct7;
 reg[31:0] immid = 32'd0;
 
-register_file reg_file(
+reg_file regFile(
     .clk(clk),
     .we(we),
     .d_in(d_in),
@@ -45,7 +45,7 @@ reg[3:0] alu_control;
 wire[31:0] alu_res;
 wire alu_error;
 
-alu alu(
+ALU alu(
     .op1(alu_op1),
     .op2(alu_op2),
     .control(alu_control),
@@ -64,11 +64,13 @@ always @(posedge clk) begin
     
         curr_instruction <= instruction;
         
-        if (instruction[5]) begin
-            rs_sel <= instruction[13:10];
+        // R-type has 1 at bit 5.
+        if (instruction[5] == 1) begin
+            rs_sel <= instruction[19:15];
+            
         end else begin
-            rs_sel <= instruction[13:10];
-            rt_sel <= instruction[17:14];
+            rs_sel <= instruction[19:15];
+            rt_sel <= instruction[24:20];
         end
         
         state <= 1;
@@ -85,14 +87,14 @@ always @(posedge clk) begin
         // Adding support for LUI (load-upper immediate) instruction
         // Opcode for Load Upper Imm = 0110111, rd = imm << 12.
         if (opcode == 7'b0110111) begin 
-            d_in <= {curr_instruction[31:12], 12'b0};
             rd_sel <= curr_instruction[11:7];
-            we <= (rd_sel != 4'b0000);
-            state <= 3;
+            d_in   <= {curr_instruction[31:12], 12'b0};
+            we     <= (curr_instruction[11:7] != 5'b00000);
+            state  <= 2;
         
         // Adding support for I-Type instruction
         end else if (opcode == 7'b001011) begin
-            immid <= {curr_instruction[31:12], 12'b0};
+            immid <= {curr_instruction[31:20], 12'b0};
             alu_op1 <= rs;
             
             // Setting ALU_CONTROL line
@@ -126,8 +128,10 @@ always @(posedge clk) begin
                 3'b101: begin
                     alu_op2 <= curr_instruction[24:20];
                     alu_control <= (funct7 == 7'b0100000) ? 4'b0111 : 4'b0110;
+                    end
+                default: begin 
+                    alu_control <= 4'b1111; 
                 end
-                default: begin alu_control <= 4'b1111; end
             endcase
       
             // Move onto next state
@@ -136,7 +140,7 @@ always @(posedge clk) begin
         // Adding support for R-type instructions       
         end else if(opcode == 7'b0110011) begin
             alu_op1 <= rs;
-            alu_op2 <= (curr_instruction[5]) ? curr_instruction[31:14] : rt;
+            alu_op2 <= rt;
             
             // Setting ALU_CONTROL
             case (funct3) 
@@ -152,7 +156,7 @@ always @(posedge clk) begin
                 3'b001: alu_control <= 4'b0101;
                 // SRA : SRL (5)
                 3'b101: alu_control <= (funct7 == 7'b0100000) ? 4'b0111 : 4'b0110;
-                default: alu_control <= 4'b1111; // invalid
+                default: alu_control <= 4'b1111;
             endcase
             
             // Move ontro next state.
@@ -164,31 +168,32 @@ always @(posedge clk) begin
             state <= 0;
         end
         
-    // Execute ALU and writing to register file.
+//    // Execute ALU and writing to register file.
     end else if (state == 2) begin
     
         if (alu_error) begin
             error <= 1;
             state <= 0;
+            
         end else begin
         
             // Write-enable only when rd_sel !=  0.
-            if (rd_sel != 4'b0000) begin
-                we <= 1;
-            end else begin
-                we <= 0;
-            end
+            we <= (rd_sel != 5'b00000);
            
             d_in <= alu_res;
             
-            rd_sel <= curr_instruction[9:6];
+            // Same for R, I, and LUI instructions.
+            rd_sel <= curr_instruction[11:6];
+            
             state <= 3;
-        end
+        end 
         
     end else if (state == 3) begin
         we <= 0;
-        state <= 0;
+        state <= 0;      
     end
+
 end
+
 
 endmodule
