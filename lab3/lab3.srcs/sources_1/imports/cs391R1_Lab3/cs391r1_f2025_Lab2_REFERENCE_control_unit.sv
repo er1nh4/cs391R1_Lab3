@@ -26,7 +26,7 @@ wire[31:0] rt;
 reg[6:0] opcode;
 reg[2:0] funct3;
 reg[6:0] funct7;
-reg[31:0] immid = 32'd0;
+reg[31:0] immid;
 
 reg_file regFile(
     .clk(clk),
@@ -64,7 +64,7 @@ always @(posedge clk) begin
     
         curr_instruction <= instruction;
         
-        // R-type has 1 at bit 5.
+        // R-type has bit 5 = 1.
         if (instruction[5] == 1) begin
             rs_sel <= instruction[19:15];
             
@@ -89,7 +89,7 @@ always @(posedge clk) begin
         if (opcode == 7'b0110111) begin 
             rd_sel <= curr_instruction[11:7];
             d_in   <= {curr_instruction[31:12], 12'b0};
-            we     <= (rd_sel != 5'b00000);
+   
             state  <= 2;
         
         // Adding support for I-Type instruction
@@ -183,7 +183,7 @@ always @(posedge clk) begin
             d_in <= alu_res;
             
             // Same for R, I, and LUI instructions.
-            rd_sel <= curr_instruction[11:6];
+            rd_sel <= curr_instruction[11:7];
             
             state <= 3;
         end 
