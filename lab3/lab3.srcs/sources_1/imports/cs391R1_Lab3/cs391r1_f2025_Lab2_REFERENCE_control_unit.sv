@@ -89,11 +89,11 @@ always @(posedge clk) begin
         if (opcode == 7'b0110111) begin 
             rd_sel <= curr_instruction[11:7];
             d_in   <= {curr_instruction[31:12], 12'b0};
-            we     <= (curr_instruction[11:7] != 5'b00000);
+            we     <= (rd_sel != 5'b00000);
             state  <= 2;
         
         // Adding support for I-Type instruction
-        end else if (opcode == 7'b001011) begin
+        end else if (opcode == 7'b0010011) begin
             immid <= {curr_instruction[31:20], 12'b0};
             alu_op1 <= rs;
             
